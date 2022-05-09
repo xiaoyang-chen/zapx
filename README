@@ -1,2 +1,3 @@
-# log-golang
-log by golang
+# zapx
+
+## encapsulation of zap with lumberjack
