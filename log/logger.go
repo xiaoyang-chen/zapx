@@ -1,16 +1,18 @@
 package log
 
 import (
+	"sync"
+
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 // "debug","info","warn","error","dPanic","panic","fatal", default "info"
-// these value can't not be Change
-var Debug, Info, Warn, Error, DPanic, Panic, Fatal func(msg string, fields ...field)
 
-var _logger *zap.Logger // consider using atomic.Value for data race
+var Debug, Info, Warn, Error, DPanic, Panic, Fatal func(msg string, fields ...field) // these value can't not be Change
+var _mu sync.Mutex                                                                   // _mu mutex Debug, Info, Warn, Error, DPanic, Panic, Fatal, _logger
+var _logger *zap.Logger
 
 func Init(serviceName, loglevel string, lumberjackLogger lumberjack.Logger) {
 
@@ -52,18 +54,7 @@ func Init(serviceName, loglevel string, lumberjackLogger lumberjack.Logger) {
 	var caller = zap.AddCaller()
 	// 设置初始化字段,如：添加一个服务器名称
 	var filed = zap.Fields(zap.String("service_name", serviceName))
-	// 构造日志
-	_logger = zap.New(core, caller, filed)
-	// 设置日志函数指针
-	{
-		Debug = getLogger().Debug
-		Info = getLogger().Info
-		Warn = getLogger().Warn
-		Error = getLogger().Error
-		DPanic = getLogger().DPanic
-		Panic = getLogger().Panic
-		Fatal = getLogger().Fatal
-	}
+	setLoggerAndLogFunc(zap.New(core, caller, filed))
 	Info("logger init success")
 	// var testErr = func() error { return errors.New("testErr") } // errors == "github.com/pkg/errors"
 	// Info("test", String("string", "aaa"), Int("int", 1), Error2Field(testErr()))
@@ -71,14 +62,26 @@ func Init(serviceName, loglevel string, lumberjackLogger lumberjack.Logger) {
 	// {"level":"INFO","time":"2022-05-09T09:08:50.867+0800","line_num":"xxx/logger.go:73","func":"xxx/logger.Info","msg":"test","service_name":"xxx","string":"aaa","int":1,"error":"testErr","errorVerbose":"testErr\nxxx/chenxiaoyang/xxx.func1\n\t/xxx/logger.go:61\n/xxx/logger.Init\n\t/xxx/logger.go:62\nmain.main.func1\n\t/xxx/main.go:14\nruntime.goexit\n\t/xxx/go/1.18.1/libexec/src/runtime/asm_amd64.s:1571"}
 }
 
-// func getLogger() *zap.Logger { return _logger.Load().(*zap.Logger) }
-func getLogger() *zap.Logger { return _logger }
+func setLoggerAndLogFunc(logger *zap.Logger) {
+
+	_mu.Lock()
+	defer _mu.Unlock()
+
+	_logger = logger
+	Debug = _logger.Debug
+	Info = _logger.Info
+	Warn = _logger.Warn
+	Error = _logger.Error
+	DPanic = _logger.DPanic
+	Panic = _logger.Panic
+	Fatal = _logger.Fatal
+}
 
 // 包装函数会导致打印出来的调用函数显示为以下包装函数的名称
-// func Debug(msg string, fields ...field) { getLogger().Debug(msg, fields...) }
-// func Info(msg string, fields ...field)   { getLogger().Info(msg, fields...) }
-// func Warn(msg string, fields ...field)   { getLogger().Warn(msg, fields...) }
-// func Error(msg string, fields ...field)  { getLogger().Error(msg, fields...) }
-// func DPanic(msg string, fields ...field) { getLogger().DPanic(msg, fields...) }
-// func Panic(msg string, fields ...field)  { getLogger().Panic(msg, fields...) }
-// func Fatal(msg string, fields ...field)  { getLogger().Fatal(msg, fields...) }
+// func Debug(msg string, fields ...field) { _logger.Debug(msg, fields...) }
+// func Info(msg string, fields ...field)   { _logger.Info(msg, fields...) }
+// func Warn(msg string, fields ...field)   { _logger.Warn(msg, fields...) }
+// func Error(msg string, fields ...field)  { _logger.Error(msg, fields...) }
+// func DPanic(msg string, fields ...field) { _logger.DPanic(msg, fields...) }
+// func Panic(msg string, fields ...field)  { _logger.Panic(msg, fields...) }
+// func Fatal(msg string, fields ...field)  { _logger.Fatal(msg, fields...) }
