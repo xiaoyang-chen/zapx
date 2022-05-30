@@ -10,7 +10,7 @@ import (
 
 // "debug","info","warn","error","dPanic","panic","fatal", default "info"
 
-var Debug, Info, Warn, Error, DPanic, Panic, Fatal func(msg string, fields ...field) // these value can't not be Change
+var Debug, Info, Warn, Error, DPanic, Panic, Fatal func(msg string, fields ...Field) // these value can't not be Change
 var _mu sync.Mutex                                                                   // _mu mutex Debug, Info, Warn, Error, DPanic, Panic, Fatal, _logger
 var _logger *zap.Logger
 
@@ -78,10 +78,10 @@ func setLoggerAndLogFunc(logger *zap.Logger) {
 }
 
 // 包装函数会导致打印出来的调用函数显示为以下包装函数的名称
-// func Debug(msg string, fields ...field) { _logger.Debug(msg, fields...) }
-// func Info(msg string, fields ...field)   { _logger.Info(msg, fields...) }
-// func Warn(msg string, fields ...field)   { _logger.Warn(msg, fields...) }
-// func Error(msg string, fields ...field)  { _logger.Error(msg, fields...) }
-// func DPanic(msg string, fields ...field) { _logger.DPanic(msg, fields...) }
-// func Panic(msg string, fields ...field)  { _logger.Panic(msg, fields...) }
-// func Fatal(msg string, fields ...field)  { _logger.Fatal(msg, fields...) }
+// func Debug(msg string, fields ...Field) { _logger.Debug(msg, fields...) }
+// func Info(msg string, fields ...Field)   { _logger.Info(msg, fields...) }
+// func Warn(msg string, fields ...Field)   { _logger.Warn(msg, fields...) }
+// func Error(msg string, fields ...Field)  { _logger.Error(msg, fields...) }
+// func DPanic(msg string, fields ...Field) { _logger.DPanic(msg, fields...) }
+// func Panic(msg string, fields ...Field)  { _logger.Panic(msg, fields...) }
+// func Fatal(msg string, fields ...Field)  { _logger.Fatal(msg, fields...) }
