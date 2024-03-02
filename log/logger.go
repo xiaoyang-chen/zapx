@@ -1,6 +1,8 @@
 package log
 
 import (
+	"os"
+
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -8,8 +10,19 @@ import (
 
 var _logger *zap.Logger
 
-func Init(serviceName, logLevel string, lumberjackLogger lumberjack.Logger) {
+type StInitFuncParams struct {
+	ServiceName, FileLogLevel, ConsoleLogLevel string
+	LumberjackLogger                           *lumberjack.Logger
+	IsConsoleEnable                            bool
+}
 
+func Init(params StInitFuncParams) {
+
+	// check params
+	if params.LumberjackLogger == nil && !params.IsConsoleEnable {
+		_logger = zap.NewNop()
+		return
+	}
 	// 设置日志级别, "debug","info","warn","error","dPanic","panic","fatal", default "info"
 	var logLevelMap = map[string]zapcore.Level{
 		"debug":  zapcore.DebugLevel,
@@ -20,8 +33,6 @@ func Init(serviceName, logLevel string, lumberjackLogger lumberjack.Logger) {
 		"panic":  zapcore.PanicLevel,
 		"fatal":  zapcore.FatalLevel,
 	}
-	var atomicLevel = zap.NewAtomicLevel()
-	atomicLevel.SetLevel(logLevelMap[logLevel])
 	var encoderConfig = zapcore.EncoderConfig{
 		MessageKey:     "msg",
 		LevelKey:       "level",
@@ -37,14 +48,25 @@ func Init(serviceName, logLevel string, lumberjackLogger lumberjack.Logger) {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 		EncodeName:     zapcore.FullNameEncoder,
 	}
-	var core = zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),
-		zapcore.AddSync(&lumberjackLogger), // 日志分割
-		atomicLevel,
-	)
+	// make zapcore
+	var cores = make([]zapcore.Core, 0, 2)
+	var fileLogLevel, consoleLogLevel = logLevelMap[params.FileLogLevel], logLevelMap[params.ConsoleLogLevel]
+	if params.LumberjackLogger != nil {
+		cores = append(cores, zapcore.NewCore(
+			zapcore.NewJSONEncoder(encoderConfig),
+			zapcore.AddSync(params.LumberjackLogger), // 日志分割
+			zap.LevelEnablerFunc(func(lvl zapcore.Level) bool { return lvl >= fileLogLevel }),
+		))
+	}
+	if params.IsConsoleEnable {
+		cores = append(cores, zapcore.NewCore(
+			zapcore.NewConsoleEncoder(encoderConfig),
+			zapcore.Lock(os.Stdout),
+			zap.LevelEnablerFunc(func(lvl zapcore.Level) bool { return lvl >= consoleLogLevel }),
+		))
+	}
 	// 开启文件及行号, 跳过封装的日志函数, 设置初始化字段, 添加服务名称
-	var filed = zap.Fields(zap.String("service_name", serviceName))
-	_logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), filed)
+	_logger = zap.New(zapcore.NewTee(cores...), zap.AddCaller(), zap.AddCallerSkip(1), zap.Fields(zap.String("service_name", params.ServiceName)))
 	Info("logger init success")
 	// var testErr = func() error { return errors.New("testErr") } // errors == "github.com/pkg/errors"
 	// Info("test", String("string", "aaa"), Int("int", 1), Error2Field(testErr()))
